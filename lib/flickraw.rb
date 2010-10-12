@@ -194,6 +194,7 @@ module FlickRaw
     end
 
     def process_response(req, http_response)
+      raise FailedResponse.new(http_response.message, http_response.code, req) if http_response.kind_of?(Net::HTTPServerError) or http_response.kind_of?(Net::HTTPClientError)
       json = JSON.load(http_response.body.empty? ? "{}" : http_response.body)
       raise FailedResponse.new(json['message'], json['code'], req) if json.delete('stat') == 'fail'
       type, json = json.to_a.first if json.size == 1 and json.all? {|k,v| v.is_a? Hash}
@@ -234,6 +235,9 @@ module FlickRaw
         "--#{boundary}--"
 
       http_response = open_flickr {|http| http.post(method, query, header) }
+      
+      raise FailedResponse.new(http_response.message, http_response.code, 'flickr.upload') if http_response.kind_of?(Net::HTTPServerError) or http_response.kind_of?(Net::HTTPClientError)
+      
       xml = http_response.body
       if xml[/stat="(\w+)"/, 1] == 'fail'
         msg = xml[/msg="([^"]+)"/, 1]
